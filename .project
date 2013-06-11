@@ -1,0 +1,16 @@
+# Gambas Project File 2.0
+# Compiled with Gambas 2.23.1
+Title=NeuroskyTest
+Startup=FMain
+Version=0.0.3
+Library=gb.gui
+Library=gb.form
+Library=gb.image
+Library=gb.net
+Library=gb.net.smtp
+Library=gb.opengl
+Library=gb.vb
+TabSize=2
+ControlPublic=1
+ModulePublic=1
+ExecPath=NeuroskyTest.gambas

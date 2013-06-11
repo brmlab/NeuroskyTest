@@ -1,0 +1,296 @@
+' Gambas class file
+
+PUBLIC CONST state_start AS Integer = 1
+PUBLIC CONST state_sync AS Integer = 2
+PUBLIC CONST state_size AS Integer = 3
+PUBLIC CONST state_payload AS Integer = 4
+PUBLIC CONST state_checksum AS Integer = 5
+
+'PUBLIC FormResetLock AS Boolean = FALSE
+
+PUBLIC plotx AS Integer = 0
+PUBLIC plt_last AS Integer = 0
+
+PUBLIC CONST data_code AS Integer = 1
+PUBLIC CONST data_length AS Integer = 2
+PUBLIC CONST data_value AS Integer = 3
+
+PUBLIC ParseState AS Integer = state_start
+
+PUBLIC PacketSize AS Byte
+PUBLIC packetCounter AS Integer
+PUBLIC PacketChecksum AS Byte
+
+PUBLIC PacketIdx AS Integer
+
+PUBLIC PacketBuffer AS NEW Byte[256]
+'PUBLIC PacketTmp AS NEW Byte[256]
+
+PUBLIC lamp_red AS Integer
+PUBLIC lamp_blue AS Integer
+PUBLIC lamp_green AS Integer
+
+PUBLIC SUB _new()
+
+END
+
+PUBLIC SUB Form_Open()
+  ComboBox1.add("RG")
+  ComboBox1.Add("CB")
+  ComboBox1.Index = 1
+END
+
+PUBLIC SUB ErrHandler(vstup AS String)
+  Message.error(vstup & "\n" & Error.text)  
+END
+
+PUBLIC SUB btn_connect_Click()
+
+   IF SerialPort.Status = 0 THEN 
+    SerialPort.PortName = "/dev/rfcomm0"
+    SerialPort.Speed = 57600
+    SerialPort.DataBits = 8
+    SerialPort.StopBits = 1
+    SerialPort.FlowControl = FALSE
+    SerialPort.Open
+  ELSE 
+    SerialPort.Close
+  ENDIF 
+CATCH 
+  ErrHandler("NeuroSky SerialPort - Error")
+END
+PUBLIC SUB SerialPort_Read()
+DIM InByte AS Byte
+'Message("CTU")
+ READ #SerialPort, InByte
+ 
+ 'TextBox1.Text = TextBox1.Text & InByte & ";"   
+    
+    SELECT CASE ParseState
+      CASE state_start
+        IF InByte = 170 THEN ParseState = state_sync
+      CASE state_sync
+        IF InByte = 170 THEN
+          ParseState = state_size
+        ELSE 
+          ParseState = state_start
+        ENDIF 
+      CASE state_size
+        PacketSize = InByte
+        'TextBox2.Text = PacketSize
+        ParseState = state_payload
+        packetCounter = 0
+        PacketChecksum = 0
+      CASE state_payload
+        PacketBuffer[packetCounter] = InByte
+        PacketChecksum = PacketChecksum + InByte
+        packetCounter = packetCounter + 1                
+        IF packetCounter = PacketSize THEN ParseState = state_checksum
+      CASE state_checksum
+        PacketChecksum = PacketChecksum XOR 255
+        IF InByte = PacketChecksum THEN 
+          txt_crc.Text = "OK"
+          ParseState = state_start
+          PacketIdx = PacketIdx + 1
+          txt_packets.Text = PacketIdx
+          'PacketTmp = PacketBuffer
+          'TextBox5.Clear
+          Parsuj(PacketSize)
+        ELSE 
+          txt_crc.Text = "CHYBA"
+          ParseState = state_start
+        ENDIF       
+      CASE ELSE     
+    
+    END SELECT 
+    
+    
+
+ 
+    'TextBox1.Text = TextBox1.Text & ";" & InByte
+
+
+
+
+END
+
+
+PUBLIC SUB Parsuj(size AS Integer)
+DIM i, x AS Integer
+DIM state AS Integer
+DIM excode AS Integer
+DIM code AS Integer
+DIM length AS Integer
+DIM data AS NEW Byte[128]
+DIM data_idx AS Integer
+DIM strtmp AS String
+DIM PacketTmp AS NEW Byte[256]
+
+PacketTmp = PacketBuffer
+
+data_idx = 0
+code = 0
+excode = 0
+state = data_code
+  
+FOR i = 0 TO size - 1
+  'TextBox5.Text = TextBox5.Text & PacketTmp[i] & ";"
+  SELECT CASE state
+    CASE data_code
+      IF PacketTmp[i] = 85 THEN
+        excode = excode + 1 
+      ELSE
+        code = PacketTmp[i]
+        IF code > 127 THEN 
+          state = data_length
+        ELSE 
+          length = 1
+          state = data_value
+        ENDIF 
+      ENDIF     
+    CASE data_length
+      length = PacketTmp[i]
+      state = data_value
+    CASE data_value
+        data[data_idx] = PacketTmp[i]
+        data_idx = data_idx + 1
+        IF data_idx = length THEN
+          FOR x = 0 TO length - 1
+            strtmp = strtmp & data[x] & "."
+          NEXT
+          Zpracuj(code, data, length)   
+          'TextArea1.Text = (Str(PacketIdx) & ":" & Str(code) & ";" & strtmp & ";" & Str(length)) & "\n" & TextArea1.Text
+          strtmp = ""
+          data_idx = 0
+          code = 0
+          excode = 0
+          state = data_code
+          length = 0
+        ENDIF 
+    CASE ELSE 
+  END SELECT 
+NEXT 
+
+END
+
+PUBLIC SUB update_lampa()
+  DIM brightness, hue AS Float
+
+  SELECT CASE ComboBox1.Text
+    CASE "RG"
+      lamp_red = Progress_attention.Value * 200
+      lamp_green = Progress_meditation.Value * 200
+    CASE "CB"
+      brightness = 1 - Progress_meditation.Value
+      hue = Progress_attention.Value
+      lamp_red = brightness * 200 * hue
+      lamp_green = brightness * 200 * (1 - hue)
+  END SELECT 
+  
+  nastav_lampu("r " & lamp_red & " " & lamp_green & " " & "0")
+  
+END
+
+
+PUBLIC SUB Zpracuj(code AS Byte, data AS Byte[], length AS Integer)
+DIM raw_eeg AS Integer
+DIM plt_aktual AS Integer
+  IF code = 2 THEN 
+    progress_signal.Value = 1 - (data[0] / 200)
+  ENDIF 
+  IF code = 4 THEN 
+    Progress_attention.Value = data[0] / 100
+    update_lampa
+  ENDIF 
+  IF code = 5 THEN 
+    Progress_meditation.Value = data[0] / 100
+    update_lampa
+  ENDIF 
+  IF code = 128 THEN 
+     raw_eeg = (data[0] * 256) + data[1]
+        IF raw_eeg > 32767 THEN raw_eeg = raw_eeg - 65536  
+
+    raw_eeg = raw_eeg * 40
+
+  Draw.Begin(dwgplot)
+   Draw.ForeColor = Color.White
+
+    plt_aktual = (raw_eeg + 32768) / (65536 / dwgplot.Height) 
+  IF plotx = 0 THEN
+   Draw.Point(plotx, plt_aktual)
+  plt_last = plt_aktual
+  ELSE 
+    Draw.Line(plotx - 1, plt_last, plotx, plt_aktual)
+    plt_last = plt_aktual
+  ENDIF  
+  Draw.End  
+  plotx = plotx + 1
+  IF plotx > dwgplot.Width THEN 
+    plotx = 0
+    dwgplot.Clear    
+  ENDIF 
+  ENDIF 
+  
+
+  
+  
+END
+ 
+
+
+
+
+PUBLIC SUB btn_lam_con_Click()
+  IF SerialLamp.Status = 0 THEN 
+    SerialLamp.PortName = "/dev/ttyUSB0"
+    SerialLamp.Speed = 9600
+    SerialLamp.DataBits = 8
+    SerialLamp.StopBits = 1
+    SerialLamp.FlowControl = FALSE
+    SerialLamp.Open
+  ELSE 
+    SerialLamp.Close
+  ENDIF 
+CATCH 
+  ErrHandler("Lamp SerialPort - Error")
+END
+
+PUBLIC SUB nastav_lampu(vstup AS String)
+  IF SerialLamp.status = 1 THEN 
+    PRINT #SerialLamp, vstup
+  ENDIF
+CATCH 
+  ErrHandler("Lamp SerialPort - COMMAND Error")
+END
+
+
+PUBLIC SUB Timer1_Timer()
+  IF SerialLamp.Status = 0 THEN 
+    Label6.BackColor = Color.Red
+  ELSE IF SerialLamp.Status = 1 THEN 
+    Label6.BackColor = Color.Green
+  ELSE 
+    Label6.BackColor = Color.Orange
+  ENDIF 
+
+  IF SerialPort.Status = 0 THEN 
+    Label5.BackColor = Color.Red
+    FormReset
+  ELSE IF SerialPort.Status = 1 THEN 
+    Label5.BackColor = Color.Green
+  ELSE 
+    Label5.BackColor = Color.Orange
+  ENDIF 
+END
+
+
+PUBLIC SUB FormReset()
+  Progress_attention.Value = 0
+  Progress_meditation.Value = 0
+  progress_signal.Value = 0
+  txt_crc.Text = "- - -"
+  txt_packets.Text = 0
+  dwgplot.Clear 
+  WAIT 
+END
+

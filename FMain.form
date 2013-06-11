@@ -1,0 +1,89 @@
+# Gambas Form File 2.0
+
+{ Form Form
+  Move(0,0,679,287)
+  #(Scaled) = False
+  Text = ("")
+  { btn_connect Button
+    Move(7,7,98,28)
+    Text = ("NeuroSky")
+  }
+  { SerialPort #SerialPort
+    #X = 539
+    #Y = 28
+  }
+  { txt_crc TextBox
+    Move(329,42,105,21)
+    Text = (" - - -")
+  }
+  { txt_packets TextBox
+    Move(329,14,105,21)
+    Text = ("0")
+  }
+  { progress_attention ProgressBar
+    Move(126,231,210,21)
+  }
+  { progress_meditation ProgressBar
+    Move(126,259,210,21)
+  }
+  { SerialLamp #SerialPort
+    #X = 497
+    #Y = 28
+  }
+  { btn_lam_con Button
+    Move(112,7,98,28)
+    Text = ("Lampa")
+  }
+  { DwgPlot DrawingArea
+    Move(7,70,658,154)
+    Background = &H000000&
+    Cached = True
+  }
+  { ComboBox1 ComboBox
+    Move(511,231,154,21)
+    Text = ("ComboBox1")
+  }
+  { Label1 Label
+    Move(14,231,105,21)
+    Text = ("SOUSTREDENI")
+  }
+  { Label2 Label
+    Move(14,259,105,14)
+    Text = ("RELAXACE")
+  }
+  { Label3 Label
+    Move(224,14,98,21)
+    Text = ("Prijato paketu:")
+  }
+  { Label4 Label
+    Move(224,42,98,21)
+    Text = ("Kontrola CRC:")
+  }
+  { Timer1 #Timer
+    #X = 455
+    #Y = 28
+    Enabled = True
+    Delay = 100
+  }
+  { Label5 Label
+    Move(7,42,98,21)
+    Text = ("STATUS")
+    Alignment = Align.Center
+  }
+  { Label6 Label
+    Move(112,42,98,21)
+    Text = ("STATUS")
+    Alignment = Align.Center
+  }
+  { Label7 Label
+    Move(413,231,84,21)
+    Text = ("PROGRAM")
+  }
+  { progress_signal ProgressBar
+    Move(581,14,77,21)
+  }
+  { Label8 Label
+    Move(504,14,56,21)
+    Text = ("SIGNAL")
+  }
+}
